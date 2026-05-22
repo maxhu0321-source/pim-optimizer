@@ -8,13 +8,11 @@ from typing import Any
 import pyxlsb
 
 from ..config import (
-    PIM1_FIELDS,
     PIM2_COLS,
     PIM2_DATA_START,
     PIM2_HEADER_ROW,
     PIM2_HOTEL_INFO,
     PIM5_DATA_START,
-    PIM5_HEADER_ROW,
     PIM5_KEY_AMENITIES,
     PLACEHOLDERS,
 )
