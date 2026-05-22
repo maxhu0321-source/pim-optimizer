@@ -7,17 +7,43 @@ from pathlib import Path
 
 st.set_page_config(page_title="PiM 校验工具", page_icon="🏨", layout="wide")
 
+# ========== 品牌色CSS注入 ==========
+st.markdown("""
+<style>
+    /* 欢朋品牌蓝色系 */
+    :root {
+        --hampton-blue: #0077C8;
+        --hampton-dark: #005BAC;
+        --hampton-deep: #003F7A;
+        --hampton-light: #E6F3FB;
+        --hampton-red: #C63527;
+    }
+    .stApp > header {
+        background-color: #0077C8;
+    }
+    h1, h2, h3 {
+        color: #003F7A !important;
+    }
+    .stMetric label {
+        color: #005BAC !important;
+    }
+    div[data-testid="stExpander"] details summary {
+        font-weight: 500;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ========== 侧边栏导航 ==========
 page = st.sidebar.radio("功能", ["📋 PiM 校验", "⚙️ 规则管理"])
 
 # ========== 管理页密码 ==========
-ADMIN_PASSWORD = "hampton2024"  # 可以改成你想要的密码
+ADMIN_PASSWORD = "hampton2024"
 
 
 # ========== 校验页面 ==========
 if page == "📋 PiM 校验":
     st.title("🏨 PiM Pack 校验工具")
-    st.caption("上传 PiM Pack (.xlsb) 和 PMS标准代码表 (.xlsx)，自动检测常见错误")
+    st.caption("Hampton by Hilton · 上传文件，自动检测常见填写错误")
 
     col1, col2 = st.columns(2)
 
@@ -25,11 +51,7 @@ if page == "📋 PiM 校验":
         pim_file = st.file_uploader("上传 PiM Pack (.xlsb)", type=["xlsb", "xlsm", "xls"])
 
     with col2:
-        pms_file = st.file_uploader("上传 PMS标准代码表 (.xlsx)", type=["xlsx"])
-
-    # 单文件提醒
-    if pim_file and not pms_file:
-        st.warning("⚠️ 未上传PMS代码表，将跳过跨文件房型一致性校验。建议同时上传两个文件获得完整校验结果。")
+        pms_file = st.file_uploader("上传 PMS标准代码表 (.xlsx)", type=["xlsx"], help="可选。上传后可进行跨文件房型一致性校验")
 
     if st.button("开始校验", type="primary", disabled=not pim_file):
         with st.spinner("正在解析文件并执行校验规则..."):
@@ -64,16 +86,19 @@ if page == "📋 PiM 校验":
 
                 # ===== 结论 =====
                 if report.can_submit:
-                    st.success(f"✅ 可以提交！（{report.warning_count} 条建议）")
+                    st.success(f"✅ 校验通过！可以提交。（{report.warning_count} 条优化建议）")
                 else:
-                    st.error(f"❌ 存在 {report.error_count} 条阻塞问题，无法提交")
+                    st.error(f"❌ 发现 {report.error_count} 条必须修改的问题，修改后才能提交")
+
+                if not pms_file:
+                    st.info("💡 提示：未上传PMS代码表，已跳过跨文件校验。如需完整校验建议同时上传。")
 
                 # ===== 指标卡片 =====
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("PiM房型数", report.total_rooms_pim)
-                m2.metric("PMS房型数", report.total_rooms_pms if pms_file else "-")
-                m3.metric("错误", report.error_count)
-                m4.metric("警告", report.warning_count)
+                m2.metric("PMS房型数", report.total_rooms_pms if pms_file else "未上传")
+                m3.metric("必须修改", report.error_count)
+                m4.metric("建议修改", report.warning_count)
 
                 # ===== 房型明细对照表 =====
                 st.divider()
@@ -105,9 +130,9 @@ if page == "📋 PiM 校验":
                             else:
                                 status = "❌ 房量不一致"
                         elif pim_rt and not pms_rt:
-                            status = "⚠️ PMS中缺失此房型"
+                            status = "⚠️ PMS中缺失"
                         else:
-                            status = "⚠️ PiM中缺失此房型"
+                            status = "⚠️ PiM中缺失"
 
                         rows_data.append({
                             "房型代码": code,
@@ -134,7 +159,7 @@ if page == "📋 PiM 校验":
                     df = pd.DataFrame(rows_data)
                     st.dataframe(df, use_container_width=True, hide_index=True)
 
-                # ===== 错误详情（用户友好位置 + 归属方标注）=====
+                # ===== 错误详情 =====
                 if errors:
                     st.divider()
                     error_items = [e for e in errors if e.severity == "error"]
@@ -149,28 +174,31 @@ if page == "📋 PiM 校验":
                         return "🟠 PiM问题"
 
                     if error_items:
-                        st.subheader(f"🚨 必须修复（{len(error_items)} 条）")
+                        st.subheader(f"🚨 必须修改（{len(error_items)} 条）")
+                        st.caption("以下问题会导致提交失败，请逐一修改")
                         for e in error_items:
                             tag = _source_tag(e)
                             friendly_loc = get_friendly_location(e.rule_id, e.location)
                             guide = get_location_guide(e.rule_id)
 
                             with st.expander(f"{tag}  [{e.rule_id}] {e.message}"):
-                                st.markdown(f"**在哪里找**：{friendly_loc}")
+                                st.markdown(f"**在哪里改**：{friendly_loc}")
                                 if guide:
-                                    st.info(f"📍 {guide}")
+                                    st.info(f"📍 如何找到：{guide}")
                                 st.markdown(f"**修改建议**：{e.fix_suggestion}")
 
                     if warn_items:
-                        st.subheader(f"⚠️ 建议修复（{len(warn_items)} 条）")
+                        st.subheader(f"⚠️ 建议修改（{len(warn_items)} 条）")
+                        st.caption("不影响提交，但建议优化")
                         for e in warn_items:
                             tag = _source_tag(e)
                             friendly_loc = get_friendly_location(e.rule_id, e.location)
                             guide = get_location_guide(e.rule_id)
 
                             with st.expander(f"{tag}  [{e.rule_id}] {e.message}"):
+                                st.markdown(f"**在哪里改**：{friendly_loc}")
                                 if guide:
-                                    st.info(f"📍 {guide}")
+                                    st.info(f"📍 如何找到：{guide}")
                                 st.markdown(f"**修改建议**：{e.fix_suggestion}")
 
                 # ===== 下载报告 =====
@@ -190,14 +218,23 @@ if page == "📋 PiM 校验":
                             type="primary",
                         )
                     except Exception as pdf_err:
-                        st.warning(f"PDF生成失败：{pdf_err}，可下载Markdown版本")
+                        st.warning(f"PDF生成失败：{pdf_err}")
+                        # Markdown 备用
+                        from pim_optimizer.reporters.markdown_reporter import to_markdown
+                        md_report = to_markdown(report)
+                        st.download_button(
+                            "📥 下载校验报告 (文本)",
+                            md_report,
+                            file_name=f"PiM校验报告_{pim_file.name.split('.')[0]}.md",
+                            mime="text/markdown",
+                        )
 
                 # Markdown备用下载
                 with dl_col2:
                     from pim_optimizer.reporters.markdown_reporter import to_markdown
                     md_report = to_markdown(report)
                     st.download_button(
-                        "📥 下载校验报告 (Markdown)",
+                        "📥 下载校验报告 (文本版)",
                         md_report,
                         file_name=f"PiM校验报告_{pim_file.name.split('.')[0]}.md",
                         mime="text/markdown",
@@ -208,7 +245,7 @@ if page == "📋 PiM 校验":
                 st.exception(e)
 
     st.divider()
-    st.caption("覆盖30+条规则：跨文件一致性 | PiM内部一致性 | 品牌标准 | 必填项 | 格式检查")
+    st.caption("覆盖30+条规则：跨文件一致性 | 内部一致性 | 品牌标准 | 必填项 | 格式检查")
 
 
 # ========== 管理页面 ==========

@@ -16,32 +16,53 @@ _FONTS_DIR = Path(__file__).parent.parent.parent / "fonts"
 _CN_FONT = _FONTS_DIR / "SourceHanSansCN-Regular.otf"
 _EN_FONT = _FONTS_DIR / "HamptonSans-Regular.ttf"
 
+# 欢朋品牌色
+_BLUE = (0, 119, 200)       # #0077C8
+_BLUE_DARK = (0, 91, 172)   # #005BAC
+_RED = (198, 53, 39)        # #C63527
+_DARK = (26, 42, 74)        # #1A2A4A
+_GREEN = (0, 150, 80)
+_ORANGE = (200, 120, 0)
+
 
 class PiMPDF(FPDF):
     def __init__(self):
         super().__init__()
-        # 注册中文字体
+        self._has_cn_font = False
         if _CN_FONT.exists():
-            self.add_font("SourceHan", "", str(_CN_FONT))
+            try:
+                self.add_font("SourceHan", "", str(_CN_FONT))
+                self._has_cn_font = True
+            except Exception:
+                pass
         if _EN_FONT.exists():
-            self.add_font("Hampton", "", str(_EN_FONT))
+            try:
+                self.add_font("Hampton", "", str(_EN_FONT))
+            except Exception:
+                pass
 
-    def _font(self, size=10, bold=False):
+    def _font(self, size=10):
         """设置字体，优先用思源黑体"""
-        if _CN_FONT.exists():
+        if self._has_cn_font:
             self.set_font("SourceHan", size=size)
         else:
-            self.set_font("Helvetica", "B" if bold else "", size)
+            self.set_font("Helvetica", "", size)
 
     def header(self):
-        self._font(16)
-        self.cell(0, 12, "PiM Pack 校验报告", new_x="LMARGIN", new_y="NEXT", align="C")
-        self.ln(2)
+        self._font(18)
+        self.set_text_color(*_BLUE_DARK)
+        self.cell(0, 14, "PiM Pack 校验报告", new_x="LMARGIN", new_y="NEXT", align="C")
+        # 品牌蓝色分割线
+        self.set_draw_color(*_BLUE)
+        self.set_line_width(0.8)
+        self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
+        self.ln(4)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "", 8)
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f"Hampton by Hilton - Page {self.page_no()}/{{nb}}", align="C")
 
 
 def generate_pdf(report: ValidationReport) -> bytes:
@@ -53,6 +74,7 @@ def generate_pdf(report: ValidationReport) -> bytes:
 
     # 基本信息
     pdf._font(10)
+    pdf.set_text_color(*_DARK)
     pdf.cell(0, 7, f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(0, 7, f"PiM文件：{report.pim_file}", new_x="LMARGIN", new_y="NEXT")
     if report.pms_file:
@@ -62,24 +84,26 @@ def generate_pdf(report: ValidationReport) -> bytes:
     pdf.ln(4)
     pdf._font(14)
     if report.can_submit:
-        pdf.set_text_color(0, 150, 0)
+        pdf.set_text_color(*_GREEN)
         pdf.cell(0, 10, "结论：可以提交", new_x="LMARGIN", new_y="NEXT")
     else:
-        pdf.set_text_color(200, 0, 0)
-        pdf.cell(0, 10, f"结论：存在 {report.error_count} 条阻塞问题", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(*_RED)
+        pdf.cell(0, 10, f"结论：存在 {report.error_count} 条必须修改的问题", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*_DARK)
 
-    # 概览表格
+    # 概览
     pdf.ln(4)
     pdf._font(12)
-    pdf.cell(0, 8, "概览", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*_BLUE_DARK)
+    pdf.cell(0, 8, "校验概览", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*_DARK)
     pdf._font(10)
 
     col_w = [60, 30]
     rows = [
         ("PiM房型数", str(report.total_rooms_pim)),
-        ("错误数", str(report.error_count)),
-        ("警告数", str(report.warning_count)),
+        ("必须修改", str(report.error_count)),
+        ("建议修改", str(report.warning_count)),
     ]
     if report.pms_file:
         rows.insert(1, ("PMS房型数", str(report.total_rooms_pms)))
@@ -95,9 +119,9 @@ def generate_pdf(report: ValidationReport) -> bytes:
     if error_items:
         pdf.ln(6)
         pdf._font(12)
-        pdf.set_text_color(200, 0, 0)
-        pdf.cell(0, 8, f"必须修复（{len(error_items)} 条）", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(*_RED)
+        pdf.cell(0, 8, f"必须修改（{len(error_items)} 条）", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*_DARK)
         pdf._font(10)
 
         for i, e in enumerate(error_items, 1):
@@ -108,19 +132,19 @@ def generate_pdf(report: ValidationReport) -> bytes:
             pdf.set_x(pdf.l_margin)
             pdf.multi_cell(w=0, h=6, text=f"{i}. [{e.rule_id}] {e.message}")
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(w=0, h=6, text=f"位置: {friendly_loc}")
+            pdf.multi_cell(w=0, h=6, text=f"   位置：{friendly_loc}")
             if guide:
                 pdf.set_x(pdf.l_margin)
-                pdf.multi_cell(w=0, h=6, text=f"查找: {guide}")
+                pdf.multi_cell(w=0, h=6, text=f"   如何找到：{guide}")
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(w=0, h=6, text=f"建议: {e.fix_suggestion}")
+            pdf.multi_cell(w=0, h=6, text=f"   修改建议：{e.fix_suggestion}")
 
     if warn_items:
         pdf.ln(6)
         pdf._font(12)
-        pdf.set_text_color(200, 150, 0)
-        pdf.cell(0, 8, f"建议修复（{len(warn_items)} 条）", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(*_ORANGE)
+        pdf.cell(0, 8, f"建议修改（{len(warn_items)} 条）", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*_DARK)
         pdf._font(10)
 
         for i, e in enumerate(warn_items, 1):
@@ -132,15 +156,15 @@ def generate_pdf(report: ValidationReport) -> bytes:
             pdf.multi_cell(w=0, h=6, text=f"{i}. [{e.rule_id}] {e.message}")
             if guide:
                 pdf.set_x(pdf.l_margin)
-                pdf.multi_cell(w=0, h=6, text=f"查找: {guide}")
+                pdf.multi_cell(w=0, h=6, text=f"   如何找到：{guide}")
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(w=0, h=6, text=f"建议: {e.fix_suggestion}")
+            pdf.multi_cell(w=0, h=6, text=f"   修改建议：{e.fix_suggestion}")
 
     if not error_items and not warn_items:
         pdf.ln(6)
         pdf._font(12)
-        pdf.set_text_color(0, 150, 0)
-        pdf.cell(0, 8, "所有检查通过，可以提交。", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(*_GREEN)
+        pdf.cell(0, 8, "所有检查通过，可以提交！", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*_DARK)
 
     return pdf.output()
