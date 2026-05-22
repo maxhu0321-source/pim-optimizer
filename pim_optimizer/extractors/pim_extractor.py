@@ -207,11 +207,105 @@ def _extract_pim2(rows: list[list[Any]], data: PiMData) -> None:
 
 
 def _extract_pim1(rows: list[list[Any]], data: PiMData) -> None:
-    """提取 PiM-1 酒店特色信息"""
+    """提取 PiM-1 酒店特色信息（动态搜索关键字段位置）"""
     info = {}
-    for key, pos in PIM1_FIELDS.items():
-        val = _get_cell(rows, pos["row"], pos["col"])
-        info[key] = val
+
+    # 动态搜索策略：通过关键词在B列或A列查找标签，值在下一列
+    # 定义搜索规则：(info_key, 搜索关键词列表, 值所在列偏移)
+    SEARCH_RULES = [
+        # 经纬度：标签在B列(col1)，值在C列(col2)
+        ("latitude", ["online latitude"], 1, 2, True),   # 找第一个
+        ("longitude", ["online longitude"], 1, 2, True),
+        # 电话
+        ("phone", ["telephone no"], 1, 2, True),
+        # 城市（第一个出现的）
+        ("city_info", ["city 城市"], 1, 2, True),
+        # 距市中心距离：标签含 "distance 距市中心"，值在C列
+        ("city_distance", ["distance 距市中心"], 1, 2, True),
+        # 安保：找 fire/safety 区域，有内容即算已填
+        ("safety_info", ["fire/safety/security"], 0, None, False),
+        # 描述
+        ("description_cn", ["descriptions (酒店描述)"], 1, None, False),
+        # 位置短描述
+        ("location_desc_short", ["location description (short)"], 1, None, False),
+    ]
+
+    for info_key, keywords, search_col, val_col, take_first in SEARCH_RULES:
+        found = False
+        for i, row in enumerate(rows):
+            if len(row) <= search_col:
+                continue
+            cell = row[search_col]
+            if not cell:
+                # 也检查 col 0
+                if search_col != 0 and len(row) > 0 and row[0]:
+                    cell = row[0]
+                    actual_search_col = 0
+                else:
+                    continue
+            else:
+                actual_search_col = search_col
+
+            s = str(cell).lower()
+            matched = any(kw in s for kw in keywords)
+            if not matched:
+                continue
+
+            # 找到了标签行
+            if val_col is not None:
+                # 值在同行的指定列
+                val = row[val_col] if len(row) > val_col else None
+                if val is not None:
+                    info[info_key] = val
+                    found = True
+            else:
+                # 值在下一行或标记为"找到了"
+                # 对于 description，值在后续几行
+                if info_key == "description_cn":
+                    # 搜索接下来的行找实际描述内容
+                    for j in range(i + 1, min(i + 20, len(rows))):
+                        next_val = rows[j][1] if len(rows[j]) > 1 else None
+                        if next_val and len(str(next_val).strip()) > 20:
+                            info[info_key] = next_val
+                            found = True
+                            break
+                elif info_key == "location_desc_short":
+                    # 值在下一行B列
+                    for j in range(i + 1, min(i + 5, len(rows))):
+                        next_val = rows[j][1] if len(rows[j]) > 1 else None
+                        if next_val and str(next_val).strip():
+                            info[info_key] = next_val
+                            found = True
+                            break
+                elif info_key == "safety_info":
+                    # 只要找到 fire/safety 区域就标记为已填
+                    # 检查后续行是否有 Y/N
+                    for j in range(i + 1, min(i + 15, len(rows))):
+                        a_val = rows[j][0] if len(rows[j]) > 0 else None
+                        if a_val and str(a_val).strip().upper() in ("Y", "N"):
+                            info[info_key] = "Y"
+                            found = True
+                            break
+
+            if found and take_first:
+                break
+
+    # 方位信息（搜索 "from hotel to city"）
+    for i, row in enumerate(rows):
+        for ci in range(min(3, len(row))):
+            cell = row[ci]
+            if cell and "from hotel to city" in str(cell).lower():
+                # 后续行找实际内容
+                for j in range(i + 1, min(i + 10, len(rows))):
+                    for ck in range(min(3, len(rows[j]))):
+                        v = rows[j][ck]
+                        if v and len(str(v).strip()) > 5:
+                            info["direction_hotel_to_city"] = v
+                            break
+                    if "direction_hotel_to_city" in info:
+                        break
+                break
+
     data.hotel_info.update(info)
 
 
