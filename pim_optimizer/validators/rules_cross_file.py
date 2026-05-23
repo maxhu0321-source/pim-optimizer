@@ -29,7 +29,7 @@ def pim_code_exists_in_pms(pim: PiMData, pms: PMSData | None) -> list[Validation
                 severity="error",
                 category="cross_file",
                 message=f"房型代码 {rt.code}（{rt.name_cn}）在PMS代码表中不存在",
-                location=f"PiM-2!E{rt.row}",
+                location=f"2.房型房价信息 第{rt.row}行",
                 fix_suggestion=f"在PMS 1.4中添加希尔顿渠道代码 {rt.code}，或修正PiM中的代码",
             ))
     return errors
@@ -50,8 +50,8 @@ def pms_code_exists_in_pim(pim: PiMData, pms: PMSData | None) -> list[Validation
                 severity="error",
                 category="cross_file",
                 message=f"PMS房型 {rt.code}（希尔顿代码{hilton}，{rt.name_cn}）在PiM中不存在",
-                location=f"PMS-1.4!E{rt.row}",
-                fix_suggestion=f"在PiM-2中添加房型 {hilton}，或从PMS中移除",
+                location=f"PMS 1.4 酒店客房 第{rt.row}行",
+                fix_suggestion=f"在「2.房型房价信息」中添加房型 {hilton}，或从PMS中移除",
             ))
     return errors
 
@@ -73,7 +73,7 @@ def room_count_matches(pim: PiMData, pms: PMSData | None) -> list[ValidationErro
                 severity="error",
                 category="cross_file",
                 message=f"房型 {code} 房量不一致：PiM={p.count}间，PMS={m.count}间",
-                location=f"PiM-2!G{p.row} vs PMS-1.4!G{m.row}",
+                location=f"2.房型房价信息 第{p.row}行 vs PMS 1.4 第{m.row}行",
                 fix_suggestion="核实实际房量，统一PiM和PMS中的数值",
             ))
     return errors

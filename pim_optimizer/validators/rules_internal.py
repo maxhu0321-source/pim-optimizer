@@ -22,9 +22,9 @@ def non_smoking_consistency(pim: PiMData, pms: PMSData | None) -> list[Validatio
             rule_id="B01",
             severity="error",
             category="internal",
-            message=f"无烟房数量不一致：PiM-2合计={pim2_total_ns}间，PiM-5设施表合计={pim5_total_ns}间",
-            location=f"PiM-2!H列 vs PiM-5!Row{amenity.row}",
-            fix_suggestion="核实各房型无烟房数量，确保PiM-2(H列)和PiM-5中数据一致",
+            message=f"无烟房数量前后不一致：「2.房型房价信息」合计={pim2_total_ns}间，「5.客房设施信息」合计={pim5_total_ns}间",
+            location="2.房型房价信息 Non-Smoking列 vs 5.客房设施信息 Non-Smoking行",
+            fix_suggestion="核实各房型无烟房数量，确保两处数据一致。如果Non-Smoking选Yes，则该房型所有房间都算无烟房",
         ))
     return errors
 
@@ -36,14 +36,13 @@ def bedding_equals_total_rooms(pim: PiMData, pms: PMSData | None) -> list[Valida
     total_rooms = sum(rt.count for rt in pim.room_types)
     total_bedding = sum(rt.bedding_count for rt in pim.room_types if rt.bedding_count > 0)
 
-    # 只在有bedding数据时才校验
     if total_bedding > 0 and total_bedding != total_rooms:
         errors.append(ValidationError(
             rule_id="B02",
             severity="error",
             category="internal",
             message=f"Bedding总数({total_bedding})与总房间数({total_rooms})不匹配",
-            location="PiM-2",
+            location="2.房型房价信息 → Bedding区域",
             fix_suggestion="检查各房型的bedding数量，确保总和等于酒店总房间数",
         ))
     return errors
@@ -66,7 +65,7 @@ def sofa_count_not_exceed_room(pim: PiMData, pms: PMSData | None) -> list[Valida
                 severity="error",
                 category="internal",
                 message=f"{amenity.name}总数({total_amenity})超过总房间数({total_rooms})",
-                location=f"PiM-5!Row{amenity.row}",
+                location=f"5.客房设施信息 第{amenity.row}行",
                 fix_suggestion=f"检查{amenity.name}各房型填写的数量，确保不超过房型总数",
             ))
     return errors
@@ -76,10 +75,8 @@ def sofa_count_not_exceed_room(pim: PiMData, pms: PMSData | None) -> list[Valida
 def accessible_info_consistent(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
     """无障碍房信息跨sheet一致"""
     errors = []
-    # 检查是否标注了无障碍房型
     accessible_count = sum(rt.count for rt in pim.room_types if rt.is_accessible)
     if accessible_count == 0 and pim.total_rooms > 0:
-        # 不在这里报（由品牌标准规则处理），但检查一致性
         pass
     return errors
 
@@ -100,8 +97,8 @@ def connecting_room_consistency(pim: PiMData, pms: PMSData | None) -> list[Valid
             rule_id="B05",
             severity="error",
             category="internal",
-            message=f"连通房数量不一致：PiM-2合计={pim2_connecting}间，PiM-5设施表={pim5_connecting}间",
-            location=f"PiM-2 vs PiM-5!Row{amenity.row}",
+            message=f"连通房数量不一致：「2.房型房价信息」={pim2_connecting}间，「5.客房设施信息」={pim5_connecting}间",
+            location="2.房型房价信息 vs 5.客房设施信息 Connecting Room行",
             fix_suggestion="核实连通房数量，确保房型页和设施页数据一致",
         ))
     return errors
@@ -122,7 +119,7 @@ def bathrobe_not_exceed_room(pim: PiMData, pms: PMSData | None) -> list[Validati
             severity="warning",
             category="internal",
             message=f"浴袍数量({total_bathrobe})超过总房间数({total_rooms})",
-            location=f"PiM-5!Row{amenity.row}",
+            location=f"5.客房设施信息 第{amenity.row}行",
             fix_suggestion="检查浴袍各房型数量，确保不超过房型总数",
         ))
     return errors

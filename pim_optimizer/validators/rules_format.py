@@ -6,6 +6,9 @@ from ..config import BRAND
 from ..models import PiMData, PMSData, ValidationError
 from .engine import rule
 
+# 明显的占位电话号码
+_PLACEHOLDER_PHONES = {"123456", "1234567", "12345678", "000000", "0000000", "00000000", "111111", "1111111", "11111111"}
+
 
 @rule("E01", "format", "error")
 def room_area_is_integer(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
@@ -22,18 +25,17 @@ def room_area_is_integer(pim: PiMData, pms: PMSData | None) -> list[ValidationEr
                 severity="error",
                 category="format",
                 message=f"房型 {rt.code} 面积为{area}，不是整数",
-                location=f"PiM-2!Row{rt.row}",
+                location=f"2.房型房价信息 第{rt.row}行",
                 fix_suggestion="房型面积必须填写整数，不能有小数",
             ))
         elif isinstance(area, str):
-            # 检查是否是区间（如 "25-30"）
             if "-" in str(area) or "~" in str(area):
                 errors.append(ValidationError(
                     rule_id="E01",
                     severity="error",
                     category="format",
                     message=f"房型 {rt.code} 面积为'{area}'，不能是区间",
-                    location=f"PiM-2!Row{rt.row}",
+                    location=f"2.房型房价信息 第{rt.row}行",
                     fix_suggestion="房型面积必须填写单一整数值，不能是区间",
                 ))
     return errors
@@ -52,7 +54,7 @@ def location_desc_length(pim: PiMData, pms: PMSData | None) -> list[ValidationEr
                 severity="error",
                 category="format",
                 message=f"酒店位置短描述({len(desc)}字)超过限制({max_len}字)",
-                location="PiM-1",
+                location="1.酒店特色信息 → Location Description(Short)",
                 fix_suggestion=f"缩短位置描述至{max_len}字以内（含空格）",
             ))
     return errors
@@ -73,7 +75,7 @@ def building_count_reasonable(pim: PiMData, pms: PMSData | None) -> list[Validat
             severity="warning",
             category="format",
             message=f"总建筑数'{val}'格式异常",
-            location="PiM-1",
+            location="1.酒店特色信息",
             fix_suggestion="总建筑数指酒店拥有几栋楼，一般为1",
         ))
         return errors
@@ -84,7 +86,7 @@ def building_count_reasonable(pim: PiMData, pms: PMSData | None) -> list[Validat
             severity="warning",
             category="format",
             message=f"总建筑数为{count}，请确认是否正确（通常为1-3）",
-            location="PiM-1",
+            location="1.酒店特色信息",
             fix_suggestion="总建筑数指酒店拥有几栋楼，一般为1",
         ))
     return errors
@@ -98,14 +100,13 @@ def floor_count_is_number(pim: PiMData, pms: PMSData | None) -> list[ValidationE
     if val is None:
         return []
     val_str = str(val).strip()
-    # 检查是否包含楼层描述（如 "3-12层" 或 "3F-12F"）
     if any(c in val_str for c in ["层", "楼", "F", "f", ","]):
         errors.append(ValidationError(
             rule_id="E05",
             severity="warning",
             category="format",
             message=f"楼层数填写为'{val_str}'，应填写数字而非具体楼层",
-            location="PiM-1",
+            location="1.酒店特色信息",
             fix_suggestion="此处填写酒店投入运营的总楼层数（数字），不是填具体哪几层",
         ))
     return errors
@@ -129,7 +130,7 @@ def lat_lng_format(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
             severity="warning",
             category="format",
             message=f"经纬度格式异常：纬度={lat}，经度={lng}",
-            location="PiM-1",
+            location="1.酒店特色信息 → 经纬度",
             fix_suggestion="经纬度应为数字格式，如 30.123456, 114.567890",
         ))
         return errors
@@ -141,7 +142,7 @@ def lat_lng_format(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
             severity="warning",
             category="format",
             message=f"经纬度可能填反：当前纬度={lat_f}，经度={lng_f}",
-            location="PiM-1",
+            location="1.酒店特色信息 → 经纬度",
             fix_suggestion="中国纬度范围18-54，经度范围73-135，请检查是否填反",
         ))
     elif not (18 <= lat_f <= 54):
@@ -151,7 +152,7 @@ def lat_lng_format(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
                 severity="warning",
                 category="format",
                 message=f"纬度{lat_f}超出中国范围(18-54)，请确认",
-                location="PiM-1",
+                location="1.酒店特色信息 → 经纬度",
                 fix_suggestion="中国纬度范围为18-54，请核实坐标",
             ))
     return errors
@@ -164,15 +165,25 @@ def phone_format_valid(pim: PiMData, pms: PMSData | None) -> list[ValidationErro
     phone = pim.hotel_info.get("phone")
     if not phone:
         return []
-    phone_str = str(phone).strip().replace(" ", "").replace("-", "")
-    # 过于简单的号码（如 12345678）
-    if phone_str.isdigit() and len(phone_str) < 7:
+    # 处理浮点数（xlsb读出来的数字带.0）
+    if isinstance(phone, float) and phone == int(phone):
+        phone_str = str(int(phone))
+    else:
+        phone_str = str(phone).strip().replace(" ", "").replace("-", "")
+
+    # 占位电话号码检测（D04已检测，这里跳过避免重复）
+    if phone_str in _PLACEHOLDER_PHONES:
+        return errors
+
+    # 去掉非数字字符后检查位数
+    digits = ''.join(c for c in phone_str if c.isdigit())
+    if len(digits) < 7:
         errors.append(ValidationError(
             rule_id="E07",
             severity="warning",
             category="format",
-            message=f"电话号码'{phone}'可能格式有误（位数过少）",
-            location="PiM-1",
-            fix_suggestion="请填写完整的酒店座机号码（含区号）",
+            message=f"电话号码'{phone_str}'位数过少（{len(digits)}位），可能不完整",
+            location="1.酒店特色信息 → 电话号码",
+            fix_suggestion="请填写完整的酒店座机号码（一般7-8位数字）",
         ))
     return errors

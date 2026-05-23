@@ -21,7 +21,7 @@ def non_smoking_minimum(pim: PiMData, pms: PMSData | None) -> list[ValidationErr
                 severity="error",
                 category="brand",
                 message=f"无烟房占比 {non_smoking}/{total} = {ratio:.0%}，低于品牌标准30%",
-                location="PiM-2!H列",
+                location="2.房型房价信息 → Non-Smoking列",
                 fix_suggestion="增加无烟房数量，确保无烟房≥总房量的30%",
             ))
     return errors
@@ -33,7 +33,6 @@ def connecting_room_minimum(pim: PiMData, pms: PMSData | None) -> list[Validatio
     errors = []
     connecting_total = sum(rt.connecting_count for rt in pim.room_types)
 
-    # 也检查amenity数据
     amenity = pim.amenities.get("connecting_room")
     if amenity:
         connecting_from_amenity = sum(v for v in amenity.counts_by_room.values() if v > 0)
@@ -45,7 +44,7 @@ def connecting_room_minimum(pim: PiMData, pms: PMSData | None) -> list[Validatio
             severity="error",
             category="brand",
             message=f"连通房仅{connecting_total}间，品牌标准要求至少{BRAND['min_connecting_rooms']}间",
-            location="PiM-5",
+            location="5.客房设施信息 → Connecting Room行",
             fix_suggestion="连通房至少需要2间，请核实酒店连通房配置",
         ))
     return errors
@@ -61,9 +60,9 @@ def accessible_room_required(pim: PiMData, pms: PMSData | None) -> list[Validati
             rule_id="C03",
             severity="error",
             category="brand",
-            message="未标注任何无障碍房房型，品牌标准要求至少1间无障碍房",
-            location="PiM-2",
-            fix_suggestion="在PiM-2中标注哪个房型存在无障碍房",
+            message="未标注任何无障碍房房型，品牌标准要求至少1间",
+            location="2.房型房价信息 → Accessible Room列",
+            fix_suggestion="在房型表中标注哪个房型有无障碍房（Accessible Room选Yes）",
         ))
     return errors
 
@@ -83,9 +82,9 @@ def sls_requires_sofa_bed(pim: PiMData, pms: PMSData | None) -> list[ValidationE
                 rule_id="C04",
                 severity="error",
                 category="brand",
-                message=f"房型 {rt.code}（亲子套房）按品牌标准需配沙发床，但设施表中未填写沙发床信息",
-                location=f"PiM-5",
-                fix_suggestion=f"在PiM-5客房设施中为 {rt.code} 填写沙发床数量",
+                message=f"房型 {rt.code}（亲子套房）按品牌标准需配沙发床，但设施表中未填写",
+                location="5.客房设施信息 → Sofa Bed行",
+                fix_suggestion=f"在「5.客房设施信息」中为 {rt.code} 填写沙发床数量",
             ))
     return errors
 
@@ -93,7 +92,6 @@ def sls_requires_sofa_bed(pim: PiMData, pms: PMSData | None) -> list[ValidationE
 @rule("C05", "brand", "warning")
 def connecting_room_has_accessible(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
     """连通房中至少1间为无障碍房"""
-    # 此规则需要更精确的数据（哪间连通房是无障碍房），暂做提醒
     errors = []
     has_connecting = any(rt.connecting_count > 0 for rt in pim.room_types)
     has_accessible = any(rt.is_accessible for rt in pim.room_types)
@@ -104,7 +102,7 @@ def connecting_room_has_accessible(pim: PiMData, pms: PMSData | None) -> list[Va
             severity="warning",
             category="brand",
             message="品牌标准要求连通房中至少1间为无障碍房，请确认",
-            location="PiM-2",
+            location="2.房型房价信息",
             fix_suggestion="确保连通房中至少有1间是无障碍房型",
         ))
     return errors
@@ -121,7 +119,7 @@ def max_occupancy_default(pim: PiMData, pms: PMSData | None) -> list[ValidationE
                 severity="warning",
                 category="brand",
                 message=f"房型 {rt.code} 最大入住人数为{rt.max_occupancy}，欢朋默认为{BRAND['default_max_occupancy']}",
-                location=f"PiM-2!I{rt.row}",
+                location=f"2.房型房价信息 第{rt.row}行 Max Occupancy列",
                 fix_suggestion="欢朋所有房型默认最多入住3人，如需修改请确认品牌许可",
             ))
     return errors
