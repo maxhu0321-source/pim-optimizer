@@ -173,33 +173,58 @@ if page == "📋 PiM 校验":
                             return "🔴 两表不一致"
                         return "🟠 PiM问题"
 
-                    if error_items:
-                        st.subheader(f"🚨 必须修改（{len(error_items)} 条）")
-                        st.caption("以下问题会导致提交失败，请逐一修改")
-                        for e in error_items:
-                            tag = _source_tag(e)
-                            friendly_loc = get_friendly_location(e.rule_id, e.location)
-                            guide = get_location_guide(e.rule_id)
+                    def _group_errors(items):
+                        """按rule_id分组，同类错误合并展示"""
+                        from collections import OrderedDict
+                        groups = OrderedDict()
+                        for e in items:
+                            if e.rule_id not in groups:
+                                groups[e.rule_id] = []
+                            groups[e.rule_id].append(e)
+                        return groups
 
-                            with st.expander(f"{tag}  [{e.rule_id}] {e.message}"):
-                                st.markdown(f"**在哪里改**：{friendly_loc}")
-                                if guide:
-                                    st.info(f"📍 如何找到：{guide}")
-                                st.markdown(f"**修改建议**：{e.fix_suggestion}")
+                    def _render_group(rule_id, group):
+                        """渲染一组同类错误"""
+                        first = group[0]
+                        tag = _source_tag(first)
+                        friendly_loc = get_friendly_location(rule_id, first.location)
+                        guide = get_location_guide(rule_id)
+
+                        if len(group) == 1:
+                            title = f"{tag}  [{rule_id}] {first.message}"
+                        else:
+                            # 合并标题：取共同描述
+                            title = f"{tag}  [{rule_id}] {first.message.split('：')[0]}等 {len(group)} 个房型存在同类问题"
+
+                        with st.expander(title):
+                            st.markdown(f"**在哪里改**：{friendly_loc}")
+                            if guide:
+                                st.info(f"📍 如何找到：{guide}")
+                            if len(group) == 1:
+                                st.markdown(f"**修改建议**：{first.fix_suggestion}")
+                            else:
+                                st.markdown("**涉及房型**：")
+                                for e in group:
+                                    st.markdown(f"- {e.message}")
+                                st.markdown(f"**修改建议**：{first.fix_suggestion}")
+
+                    if error_items:
+                        grouped = _group_errors(error_items)
+                        total_groups = len(grouped)
+                        total_issues = len(error_items)
+                        st.subheader(f"🚨 必须修改（{total_issues} 个问题，{total_groups} 类）")
+                        st.caption("以下问题会导致提交失败，请逐一修改")
+                        for rule_id, group in grouped.items():
+                            _render_group(rule_id, group)
 
                     if warn_items:
-                        st.subheader(f"⚠️ 建议修改（{len(warn_items)} 条）")
+                        grouped = _group_errors(warn_items)
+                        total_groups = len(grouped)
+                        total_issues = len(warn_items)
+                        st.subheader(f"⚠️ 建议修改（{total_issues} 个问题，{total_groups} 类）")
                         st.caption("不影响提交，但建议优化")
-                        for e in warn_items:
-                            tag = _source_tag(e)
-                            friendly_loc = get_friendly_location(e.rule_id, e.location)
-                            guide = get_location_guide(e.rule_id)
-
-                            with st.expander(f"{tag}  [{e.rule_id}] {e.message}"):
-                                st.markdown(f"**在哪里改**：{friendly_loc}")
-                                if guide:
-                                    st.info(f"📍 如何找到：{guide}")
-                                st.markdown(f"**修改建议**：{e.fix_suggestion}")
+                        for rule_id, group in grouped.items():
+                            _render_group(rule_id, group)
 
                 # ===== 下载报告 =====
                 st.divider()
