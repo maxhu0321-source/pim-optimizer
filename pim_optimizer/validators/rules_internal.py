@@ -8,24 +8,38 @@ from .engine import rule
 
 @rule("B01", "internal", "error")
 def non_smoking_consistency(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
-    """PiM-2无烟房数量与PiM-5设施表中无烟房数量一致"""
+    """PiM-2无烟房标记与PiM-5设施表中无烟房数量逐房型校验"""
     errors = []
     amenity = pim.amenities.get("non_smoking")
     if not amenity:
         return []
 
-    pim2_total_ns = sum(rt.non_smoking_count for rt in pim.room_types)
-    pim5_total_ns = sum(v for v in amenity.counts_by_room.values() if v > 0)
+    for rt in pim.room_types:
+        pim5_count = amenity.counts_by_room.get(rt.code)
+        if pim5_count is None:
+            continue
 
-    if pim2_total_ns > 0 and pim5_total_ns > 0 and pim2_total_ns != pim5_total_ns:
-        errors.append(ValidationError(
-            rule_id="B01",
-            severity="error",
-            category="internal",
-            message=f"无烟房数量前后不一致：「2.房型房价信息」合计={pim2_total_ns}间，「5.客房设施信息」合计={pim5_total_ns}间",
-            location="2.房型房价信息 Non-Smoking列 vs 5.客房设施信息 Non-Smoking行",
-            fix_suggestion="核实各房型无烟房数量，确保两处数据一致。如果Non-Smoking选Yes，则该房型所有房间都算无烟房",
-        ))
+        half = rt.count / 2
+        is_yes = rt.non_smoking_count > 0  # PiM-2 标记为 Yes
+
+        if is_yes and pim5_count < half:
+            errors.append(ValidationError(
+                rule_id="B01",
+                severity="error",
+                category="internal",
+                message=f"房型 {rt.code}：「2.房型房价信息」无烟房标记为Yes（应过半），但「5.客房设施信息」仅填{pim5_count}间（共{rt.count}间）",
+                location=f"2.房型房价信息 第{rt.row}行 vs 5.客房设施信息 Non-Smoking行",
+                fix_suggestion=f"房型 {rt.code} 标Yes表示多数为无烟房，请确认「5.客房设施信息」无烟房数量≥{int(half)+1}间，或将标记改为No",
+            ))
+        elif not is_yes and pim5_count > half:
+            errors.append(ValidationError(
+                rule_id="B01",
+                severity="error",
+                category="internal",
+                message=f"房型 {rt.code}：「2.房型房价信息」无烟房标记为No（应不过半），但「5.客房设施信息」填了{pim5_count}间（共{rt.count}间）",
+                location=f"2.房型房价信息 第{rt.row}行 vs 5.客房设施信息 Non-Smoking行",
+                fix_suggestion=f"房型 {rt.code} 标No表示无烟房不超过半数，请确认「5.客房设施信息」数量≤{int(half)}间，或将标记改为Yes",
+            ))
     return errors
 
 

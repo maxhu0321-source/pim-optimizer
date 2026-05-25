@@ -12,8 +12,18 @@ def non_smoking_minimum(pim: PiMData, pms: PMSData | None) -> list[ValidationErr
     """无烟房 ≥ 30%总房量"""
     errors = []
     total = sum(rt.count for rt in pim.room_types)
-    non_smoking = sum(rt.non_smoking_count for rt in pim.room_types)
-    if total > 0 and non_smoking > 0:
+    if total == 0:
+        return []
+
+    # 优先用PiM-5的实际无烟房数量
+    amenity = pim.amenities.get("non_smoking")
+    if amenity and any(v > 0 for v in amenity.counts_by_room.values()):
+        non_smoking = sum(v for v in amenity.counts_by_room.values() if v > 0)
+    else:
+        # 退回用PiM-2的Yes/No推算
+        non_smoking = sum(rt.non_smoking_count for rt in pim.room_types)
+
+    if non_smoking > 0:
         ratio = non_smoking / total
         if ratio < BRAND["min_non_smoking_ratio"]:
             errors.append(ValidationError(
