@@ -88,10 +88,10 @@ if page == "📋 PiM 校验":
                 if report.can_submit:
                     st.success(f"✅ 校验通过！可以提交。（{report.warning_count} 条优化建议）")
                 else:
-                    st.error(f"❌ 发现 {report.error_count} 条必须修改的问题，修改后才能提交")
+                    st.error(f"❌ 发现 {report.error_count} 个必须修改的问题")
 
                 if not pms_file:
-                    st.info("💡 提示：未上传PMS代码表，已跳过跨文件校验。如需完整校验建议同时上传。")
+                    st.info("💡 未上传PMS代码表，已跳过跨文件校验。如需完整校验建议同时上传。")
 
                 # ===== 指标卡片 =====
                 m1, m2, m3, m4 = st.columns(4)
@@ -159,72 +159,81 @@ if page == "📋 PiM 校验":
                     df = pd.DataFrame(rows_data)
                     st.dataframe(df, use_container_width=True, hide_index=True)
 
-                # ===== 错误详情 =====
+                # ===== 修改清单 =====
                 if errors:
                     st.divider()
-                    error_items = [e for e in errors if e.severity == "error"]
-                    warn_items = [e for e in errors if e.severity == "warning"]
+                    from pim_optimizer.location_labels import get_tab_for_rule, TAB_ORDER
 
-                    def _source_tag(error):
-                        loc = error.location.upper()
-                        if "PMS" in loc:
-                            return "🔵 PMS问题"
-                        if error.category == "cross_file":
-                            return "🔴 两表不一致"
-                        return "🟠 PiM问题"
+                    error_count = sum(1 for e in errors if e.severity == "error")
+                    warn_count = sum(1 for e in errors if e.severity == "warning")
 
-                    def _group_errors(items):
-                        """按rule_id分组，同类错误合并展示"""
-                        from collections import OrderedDict
-                        groups = OrderedDict()
-                        for e in items:
-                            if e.rule_id not in groups:
-                                groups[e.rule_id] = []
-                            groups[e.rule_id].append(e)
-                        return groups
+                    if error_count > 0:
+                        st.error(f"共 {error_count} 个必须修改的问题，请按以下清单逐项修改")
+                    if warn_count > 0:
+                        st.warning(f"另有 {warn_count} 条优化建议")
 
-                    def _render_group(rule_id, group):
-                        """渲染一组同类错误"""
-                        first = group[0]
-                        tag = _source_tag(first)
-                        friendly_loc = get_friendly_location(rule_id, first.location)
-                        guide = get_location_guide(rule_id)
+                    # 按页签分组
+                    from collections import OrderedDict
+                    tabs = OrderedDict()
+                    for tab_name in TAB_ORDER:
+                        tabs[tab_name] = []
+                    for e in errors:
+                        tab = get_tab_for_rule(e.rule_id)
+                        if tab not in tabs:
+                            tabs[tab] = []
+                        tabs[tab].append(e)
 
-                        if len(group) == 1:
-                            title = f"{tag}  [{rule_id}] {first.message}"
-                        else:
-                            # 合并标题：取共同描述
-                            title = f"{tag}  [{rule_id}] {first.message.split('：')[0]}等 {len(group)} 个房型存在同类问题"
+                    for tab_name, tab_errors in tabs.items():
+                        if not tab_errors:
+                            st.markdown(f"### ✅ {tab_name}")
+                            st.caption("没有发现问题")
+                            st.markdown("")
+                            continue
 
-                        with st.expander(title):
-                            st.markdown(f"**在哪里改**：{friendly_loc}")
-                            if guide:
-                                st.info(f"📍 如何找到：{guide}")
+                        err_in_tab = sum(1 for e in tab_errors if e.severity == "error")
+                        warn_in_tab = sum(1 for e in tab_errors if e.severity == "warning")
+                        counts = []
+                        if err_in_tab:
+                            counts.append(f"{err_in_tab} 个必改")
+                        if warn_in_tab:
+                            counts.append(f"{warn_in_tab} 个建议")
+                        st.markdown(f"### 📄 {tab_name}（{'，'.join(counts)}）")
+
+                        # 同一rule_id合并
+                        rule_groups = OrderedDict()
+                        for e in tab_errors:
+                            if e.rule_id not in rule_groups:
+                                rule_groups[e.rule_id] = []
+                            rule_groups[e.rule_id].append(e)
+
+                        for rule_id, group in rule_groups.items():
+                            first = group[0]
+                            icon = "🔴" if first.severity == "error" else "🟡"
+                            guide = get_location_guide(rule_id)
+
+                            # 位置信息：取二级目录部分
+                            loc = get_friendly_location(rule_id, first.location)
+                            # 去掉一级目录前缀，只保留二级以下
+                            for prefix in TAB_ORDER:
+                                if loc.startswith(prefix + " → "):
+                                    loc = loc[len(prefix) + 3:]
+                                    break
+
                             if len(group) == 1:
-                                st.markdown(f"**修改建议**：{first.fix_suggestion}")
+                                st.markdown(f"{icon} **{loc}**")
+                                st.markdown(f"　　{first.message}")
+                                st.markdown(f"　　→ {first.fix_suggestion}")
                             else:
-                                st.markdown("**涉及房型**：")
+                                # 多条合并
+                                st.markdown(f"{icon} **{loc}**（{len(group)} 个房型）")
                                 for e in group:
-                                    st.markdown(f"- {e.message}")
-                                st.markdown(f"**修改建议**：{first.fix_suggestion}")
+                                    # 提取房型代码和关键数字
+                                    st.markdown(f"　　· {e.message}")
+                                st.markdown(f"　　→ {first.fix_suggestion}")
 
-                    if error_items:
-                        grouped = _group_errors(error_items)
-                        total_groups = len(grouped)
-                        total_issues = len(error_items)
-                        st.subheader(f"🚨 必须修改（{total_issues} 个问题，{total_groups} 类）")
-                        st.caption("以下问题会导致提交失败，请逐一修改")
-                        for rule_id, group in grouped.items():
-                            _render_group(rule_id, group)
-
-                    if warn_items:
-                        grouped = _group_errors(warn_items)
-                        total_groups = len(grouped)
-                        total_issues = len(warn_items)
-                        st.subheader(f"⚠️ 建议修改（{total_issues} 个问题，{total_groups} 类）")
-                        st.caption("不影响提交，但建议优化")
-                        for rule_id, group in grouped.items():
-                            _render_group(rule_id, group)
+                            if guide:
+                                st.caption(f"　　📍 {guide}")
+                            st.markdown("")  # 留白
 
                 # ===== 下载报告 =====
                 st.divider()
