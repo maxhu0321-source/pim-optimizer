@@ -6,3 +6,6 @@ __pycache__/
 test_report_*.md
 *.xlsb
 *.xlsx
+# 但保留模版文件
+!templates/*.xlsb
+!templates/*.xlsx
