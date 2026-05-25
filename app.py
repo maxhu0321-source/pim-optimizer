@@ -55,6 +55,14 @@ if pms_tpl.exists():
         file_name="PMS_Standard_Code_Table.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+guide_pdf = Path("templates/PiM_Pack_填写指引.pdf")
+if guide_pdf.exists():
+    st.sidebar.download_button(
+        "PiM Pack 填写指引",
+        guide_pdf.read_bytes(),
+        file_name="PiM_Pack_填写指引.pdf",
+        mime="application/pdf",
+    )
 
 # ========== 管理页密码 ==========
 ADMIN_PASSWORD = "hampton2024"
