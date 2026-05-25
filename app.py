@@ -36,6 +36,26 @@ st.markdown("""
 # ========== 侧边栏导航 ==========
 page = st.sidebar.radio("功能", ["📋 PiM 校验", "📖 模版与指南"])
 
+# ========== 侧边栏：模版快捷下载 ==========
+st.sidebar.divider()
+st.sidebar.markdown("**📥 模版下载**")
+pim_tpl = Path("templates/PiM_Pack_Hampton_Template.xlsb")
+pms_tpl = Path("templates/PMS_Standard_Code_Table.xlsx")
+if pim_tpl.exists():
+    st.sidebar.download_button(
+        "PiM Pack 模版",
+        pim_tpl.read_bytes(),
+        file_name="PiM_Pack_Hampton_Template.xlsb",
+        mime="application/octet-stream",
+    )
+if pms_tpl.exists():
+    st.sidebar.download_button(
+        "PMS 代码表模版",
+        pms_tpl.read_bytes(),
+        file_name="PMS_Standard_Code_Table.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 # ========== 管理页密码 ==========
 ADMIN_PASSWORD = "hampton2024"
 
