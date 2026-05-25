@@ -312,13 +312,27 @@ def _extract_pim5(rows: list[list[Any]], data: PiMData) -> None:
     if not rows:
         return
 
-    # 先从header行确定房型代码与列的映射
-    # PiM-5 的列结构：A列=设施名, 后续列=各房型
-    # 需要从 PiM-2 提取的房型代码列表来匹配
+    # --- 第一步：从 header 区域（约 row 10-12）建立 列号→房型代码 映射 ---
+    # PiM-5 的房型代码行通常在 row 12 附近，包含 SKR/SVR 等代码
+    room_codes_from_pim2 = {rt.code for rt in data.room_types}
+    col_to_code: dict[int, str] = {}
 
-    # 读取设施数据
-    room_codes_from_pim2 = [rt.code for rt in data.room_types]
+    # 搜索 row 10-13 找到包含房型代码的那一行
+    for scan_row in range(9, min(14, len(rows))):
+        row = rows[scan_row]
+        matches = 0
+        temp_map = {}
+        for col_idx in range(1, len(row)):
+            val = _clean_code(row[col_idx]) if row[col_idx] else ""
+            if val in room_codes_from_pim2:
+                temp_map[col_idx] = val
+                matches += 1
+        # 如果这行匹配到了多个房型代码，就是我们要的
+        if matches >= 2 or (matches >= 1 and len(room_codes_from_pim2) <= 2):
+            col_to_code = temp_map
+            break
 
+    # --- 第二步：读取设施行数据 ---
     for row_num_0based, row in enumerate(rows):
         row_num = row_num_0based + 1
         if row_num < PIM5_DATA_START:
@@ -339,8 +353,14 @@ def _extract_pim5(rows: list[list[Any]], data: PiMData) -> None:
 
         if matched_key:
             amenity_row = AmenityRow(name=amenity_name, row=row_num)
-            # 提取各列数值（跳过A列）
-            for col_idx in range(1, len(row)):
-                val = _to_int(row[col_idx])
-                amenity_row.counts_by_room[f"col_{col_idx}"] = val
+            if col_to_code:
+                # 用房型代码作为 key
+                for col_idx, code in col_to_code.items():
+                    val = _to_int(row[col_idx]) if col_idx < len(row) else 0
+                    amenity_row.counts_by_room[code] = val
+            else:
+                # fallback：用列号
+                for col_idx in range(1, len(row)):
+                    val = _to_int(row[col_idx])
+                    amenity_row.counts_by_room[f"col_{col_idx}"] = val
             data.amenities[matched_key] = amenity_row
