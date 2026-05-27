@@ -141,6 +141,8 @@ def _extract_pim2(rows: list[list[Any]], data: PiMData) -> None:
             data.opening_date = str(val or "").strip()
         elif key == "adr":
             data.hotel_info["adr"] = val
+        elif key == "fold_bed_count":
+            data.hotel_info["fold_bed_count"] = val
 
     # 房型数据（从 row 15 开始）
     current_category = ""
@@ -254,6 +256,16 @@ def _extract_pim1(rows: list[list[Any]], data: PiMData) -> None:
                 # 值在同行的指定列
                 val = row[val_col] if len(row) > val_col else None
                 if val is not None:
+                    # 对 city_distance 特殊处理：如果C列只是单位，把相邻列的数字也合并
+                    if info_key == "city_distance":
+                        import re
+                        val_str = str(val).strip()
+                        if not re.search(r'\d', val_str):
+                            # C列没有数字，检查D列（val_col+1）是否有数字
+                            next_col = val_col + 1
+                            next_val = row[next_col] if len(row) > next_col else None
+                            if next_val is not None and re.search(r'\d', str(next_val)):
+                                val = f"{next_val} {val_str}"
                     info[info_key] = val
                     found = True
             else:

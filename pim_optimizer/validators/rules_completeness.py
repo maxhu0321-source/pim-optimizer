@@ -56,13 +56,14 @@ def fold_bed_filled(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
     """折叠床数量已填"""
     errors = []
     fold = pim.hotel_info.get("fold_bed_count")
-    if _is_empty(fold):
+    # 0 是有效值（表示没有折叠床），只有 None 才算未填
+    if fold is None:
         errors.append(ValidationError(
             rule_id="D03",
             severity="warning",
             category="completeness",
             message="折叠床数量未填写（欢朋通常为0）",
-            location="5.客房设施信息 → Rollaways折叠床",
+            location="2.房型房价信息 → Rollaways折叠床",
             fix_suggestion="如无可移动加床请填写0",
         ))
     return errors
@@ -138,8 +139,10 @@ def city_info_filled(pim: PiMData, pms: PMSData | None) -> list[ValidationError]
     distance = pim.hotel_info.get("city_distance")
     if distance:
         dist_str = str(distance).strip().upper()
-        # 只有单位没有数字
-        if dist_str in ("KM", "M", "公里", "千米", ""):
+        # 去掉所有单位后看是否还有数字
+        import re
+        has_number = bool(re.search(r'\d', dist_str))
+        if not has_number:
             errors.append(ValidationError(
                 rule_id="D06",
                 severity="error",

@@ -27,6 +27,7 @@ PIM2_HOTEL_INFO = {
     "opening_date": {"row": 7, "col": 1},    # B7
     "total_rooms": {"row": 8, "col": 1},     # B8
     "adr": {"row": 9, "col": 1},             # B9: ADR Forecast
+    "fold_bed_count": {"row": 33, "col": 1}, # B33: Number of rollaway beds
 }
 
 # ============================================================
@@ -92,6 +93,7 @@ PIM5_KEY_AMENITIES = {
     "visual_alarm": "Visual",
     "remote_curtain": "Remote",
     "lounge": "Lounge",
+    "rollaway": "Rollaway",
 }
 
 # ============================================================
