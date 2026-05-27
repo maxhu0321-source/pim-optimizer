@@ -326,6 +326,7 @@ def _extract_pim5(rows: list[list[Any]], data: PiMData) -> None:
 
     # --- 第一步：从 header 区域（约 row 10-12）建立 列号→房型代码 映射 ---
     # PiM-5 的房型代码行通常在 row 12 附近，包含 SKR/SVR 等代码
+    # 注意：同一房型代码可能出现在多个区域（Standard + Accessible）
     room_codes_from_pim2 = {rt.code for rt in data.room_types}
     col_to_code: dict[int, str] = {}
 
@@ -366,10 +367,10 @@ def _extract_pim5(rows: list[list[Any]], data: PiMData) -> None:
         if matched_key:
             amenity_row = AmenityRow(name=amenity_name, row=row_num)
             if col_to_code:
-                # 用房型代码作为 key
+                # 用房型代码作为 key，同一代码多列时累加
                 for col_idx, code in col_to_code.items():
                     val = _to_int(row[col_idx]) if col_idx < len(row) else 0
-                    amenity_row.counts_by_room[code] = val
+                    amenity_row.counts_by_room[code] = amenity_row.counts_by_room.get(code, 0) + val
             else:
                 # fallback：用列号
                 for col_idx in range(1, len(row)):
