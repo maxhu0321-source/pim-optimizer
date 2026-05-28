@@ -9,3 +9,5 @@ test_report_*.md
 # 但保留模版文件
 !templates/*.xlsb
 !templates/*.xlsx
+email_draft.md
+patch.json

@@ -112,6 +112,12 @@ if page == "📋 PiM 校验":
                     errors=errors,
                 )
 
+                try:
+                    from pim_optimizer.stats import record_usage
+                    record_usage(pim_data, report)
+                except Exception:
+                    pass
+
                 # ===== 结论 =====
                 if report.can_submit:
                     st.success(f"✅ 校验通过！可以提交。（{report.warning_count} 条优化建议）")
@@ -487,3 +493,40 @@ elif page == "📖 模版与指南":
                 BRAND["default_max_occupancy"] = new_max_occ
                 BRAND["location_desc_max_chars"] = new_loc_chars
                 st.success("✅ 配置已保存（当前会话生效）")
+
+            st.divider()
+            st.markdown("**使用统计**")
+            st.caption("数据存储在飞书 Base：PiM校验工具使用统计")
+
+            try:
+                from pim_optimizer.stats import build_usage_summary, fetch_usage_records
+
+                records = fetch_usage_records()
+                if not records:
+                    st.info("暂无统计数据，或尚未配置飞书 Base 访问密钥。")
+                else:
+                    usage_df, daily_df, top_rules_df = build_usage_summary(records)
+
+                    s1, s2, s3, s4 = st.columns(4)
+                    s1.metric("累计校验", len(usage_df))
+                    s2.metric("涉及酒店", usage_df["Inncode"].replace("", None).nunique())
+                    s3.metric("平均必改项", f"{usage_df['错误数'].mean():.1f}")
+                    s4.metric("通过率", f"{usage_df['是否通过'].mean() * 100:.0f}%")
+
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown("**按日期趋势**")
+                        st.dataframe(daily_df, use_container_width=True, hide_index=True)
+                    with c2:
+                        st.markdown("**常见错误 TOP10**")
+                        st.dataframe(top_rules_df, use_container_width=True, hide_index=True)
+
+                    st.markdown("**最近校验记录**")
+                    show_cols = ["校验日期", "酒店名称", "Inncode", "PiM文件名", "错误数", "警告数", "是否通过", "错误规则"]
+                    st.dataframe(
+                        usage_df.sort_values("校验时间", ascending=False)[show_cols].head(50),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            except Exception as stats_err:
+                st.warning(f"使用统计读取失败：{stats_err}")
