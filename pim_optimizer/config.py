@@ -94,6 +94,7 @@ PIM5_KEY_AMENITIES = {
     "remote_curtain": "Remote",
     "lounge": "Lounge",
     "rollaway": "Rollaway",
+    "television": "TV  Flat Panel HD",
 }
 
 # ============================================================

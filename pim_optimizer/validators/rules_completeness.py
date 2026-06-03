@@ -204,3 +204,39 @@ def accessible_room_type_marked(pim: PiMData, pms: PMSData | None) -> list[Valid
             fix_suggestion="在房型表中标注无障碍房对应的房型代码（Accessible Room选Yes）",
         ))
     return errors
+
+
+@rule("D10", "completeness", "error")
+def television_size_filled(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
+    """电视机尺寸已填写"""
+    errors = []
+    amenity = pim.amenities.get("television")
+    if not amenity:
+        # PiM-5 没有电视机行，也算未填
+        errors.append(ValidationError(
+            rule_id="D10",
+            severity="error",
+            category="completeness",
+            message="电视机尺寸未填写",
+            location="5.客房设施信息 → Television行",
+            fix_suggestion="请在「5.客房设施信息」Television行为每个房型选择电视尺寸（下拉单选）",
+        ))
+        return errors
+
+    # 检查每个房型是否都填了电视尺寸
+    missing_rooms = []
+    for rt in pim.room_types:
+        size = amenity.counts_by_room.get(rt.code)
+        if size is None or size == 0:
+            missing_rooms.append(rt.code)
+
+    if missing_rooms:
+        errors.append(ValidationError(
+            rule_id="D10",
+            severity="error",
+            category="completeness",
+            message=f"电视机尺寸未填写（{len(missing_rooms)}个房型）",
+            location="5.客房设施信息 → Television行",
+            fix_suggestion="请在「5.客房设施信息」TV Flat Panel HD行为每个房型选择电视尺寸（下拉单选）",
+        ))
+    return errors
