@@ -240,3 +240,23 @@ def television_size_filled(pim: PiMData, pms: PMSData | None) -> list[Validation
             fix_suggestion="请在「5.客房设施信息」TV Flat Panel HD行为每个房型选择电视尺寸（下拉单选）",
         ))
     return errors
+
+
+@rule("D11", "completeness", "error")
+def bedding_total_matches_room_count(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
+    """寝具总数等于房型总数"""
+    errors = []
+    if not pim.room_types:
+        return errors
+
+    bedding_total = sum(rt.bedding_count for rt in pim.room_types)
+    if bedding_total != pim.total_rooms:
+        errors.append(ValidationError(
+            rule_id="D11",
+            severity="error",
+            category="completeness",
+            message=f"寝具总数({bedding_total})不等于房型总数({pim.total_rooms})",
+            location="2.房型房价信息 → Bedding列",
+            fix_suggestion="请检查每个房型的Bedding数量，确保各房型寝具数量之和等于总房量",
+        ))
+    return errors
