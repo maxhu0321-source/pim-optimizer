@@ -36,10 +36,6 @@ LOCATION_GUIDES = {
         "label": "2.房型房价信息 → Non-Smoking列 vs 5.客房设施信息 → Room Amenities → Non-Smoking行",
         "guide": "打开「2.房型房价信息」查看各房型的Non-Smoking列标记（Yes/No），再打开「5.客房设施信息」向下找到 Room Amenities 区域的Non-Smoking行，两处数据必须匹配：标Yes的房型无烟房数应超过半数",
     },
-    "B02": {
-        "label": "2.房型房价信息 → Bedding区域",
-        "guide": "在「2.房型房价信息」下方找到Bedding区域，各床型数量加总应等于酒店总房量",
-    },
     "B03": {
         "label": "5.客房设施信息 → Room Amenities → Sofa/Sofa Bed行",
         "guide": "打开「5.客房设施信息」向下找到 Room Amenities 区域的 Sofa 或 Sofa Bed 行，每个房型填写的数量不能超过该房型总房间数",
@@ -161,7 +157,6 @@ RULE_TO_TAB = {
     "A03": "两表对照",
     # B类：跨页签
     "B01": "5.客房设施信息",
-    "B02": "2.房型房价信息",
     "B03": "5.客房设施信息",
     "B04": "2.房型房价信息",
     "B05": "5.客房设施信息",

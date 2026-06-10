@@ -43,25 +43,6 @@ def non_smoking_consistency(pim: PiMData, pms: PMSData | None) -> list[Validatio
     return errors
 
 
-@rule("B02", "internal", "error")
-def bedding_equals_total_rooms(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
-    """Bedding总数应等于总房间数"""
-    errors = []
-    total_rooms = sum(rt.count for rt in pim.room_types)
-    total_bedding = sum(rt.bedding_count for rt in pim.room_types if rt.bedding_count > 0)
-
-    if total_bedding > 0 and total_bedding != total_rooms:
-        errors.append(ValidationError(
-            rule_id="B02",
-            severity="error",
-            category="internal",
-            message=f"Bedding总数({total_bedding})与总房间数({total_rooms})不匹配",
-            location="2.房型房价信息 → Bedding区域",
-            fix_suggestion="检查各房型的bedding数量，确保总和等于酒店总房间数",
-        ))
-    return errors
-
-
 @rule("B03", "internal", "error")
 def sofa_count_not_exceed_room(pim: PiMData, pms: PMSData | None) -> list[ValidationError]:
     """沙发/沙发床数量不应超过对应房型总数"""

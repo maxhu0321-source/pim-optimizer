@@ -19,7 +19,6 @@ class RoomType:
     area_sqm: Any = None   # 原始值，用于校验是否整数
     bed_type: str = ""
     bed_size: str = ""
-    bedding_count: int = 0
     is_accessible: bool = False
     connecting_count: int = 0
     extra_bed: str = ""    # Y/N
@@ -62,6 +61,11 @@ class PiMData:
     # PiM-2 中的无障碍/连通房汇总（与PiM-5交叉校验用）
     accessible_room_types: list[str] = field(default_factory=list)
     connecting_room_types: list[str] = field(default_factory=list)
+
+    # PiM-1 Bedding 区块各床型数量之和（应等于总房量）
+    bedding_total: int = 0
+    # PiM-5 顶部 TV Size 表：每项 (类别名, 房间数, 尺寸原始值)
+    tv_size_rows: list[tuple[str, int, Any]] = field(default_factory=list)
 
 
 @dataclass

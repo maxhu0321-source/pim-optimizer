@@ -316,6 +316,22 @@ def _extract_pim1(rows: list[list[Any]], data: PiMData) -> None:
                         break
                 break
 
+    # Bedding 寝具区块：标签行后纵向罗列床型，数量在 col0，床型名在 col1
+    for i, row in enumerate(rows):
+        if len(row) > 0 and row[0] and str(row[0]).strip() == "Bedding 寝具":
+            total = 0
+            for j in range(i + 1, min(i + 12, len(rows))):
+                next_row = rows[j]
+                name = str(next_row[1]).strip() if len(next_row) > 1 and next_row[1] else ""
+                if not name:
+                    # 空行视为区块结束
+                    if name == "" and not (len(next_row) > 0 and next_row[0]):
+                        break
+                    continue
+                total += _to_int(next_row[0]) if len(next_row) > 0 else 0
+            data.bedding_total = total
+            break
+
     data.hotel_info.update(info)
 
 
@@ -323,6 +339,29 @@ def _extract_pim5(rows: list[list[Any]], data: PiMData) -> None:
     """提取 PiM-5 客房设施数据"""
     if not rows:
         return
+
+    # --- TV Size 顶部小表：表头含 "TV Size"，下方按 Standard/Suites/Accessible 填尺寸 ---
+    for i, row in enumerate(rows):
+        tv_col = None
+        for col_idx, cell in enumerate(row):
+            if cell and "tv size" in str(cell).lower():
+                tv_col = col_idx
+                break
+        if tv_col is None:
+            continue
+        # 找到表头行，向下读取类别行
+        for j in range(i + 1, min(i + 6, len(rows))):
+            r = rows[j]
+            name = str(r[0]).strip() if len(r) > 0 and r[0] else ""
+            if not name:
+                break
+            low = name.lower()
+            if not any(k in low for k in ("standard", "suite", "accessible", "普通", "套房", "无障碍")):
+                break
+            rooms = _to_int(r[2]) if len(r) > 2 else 0
+            size = r[tv_col] if len(r) > tv_col else None
+            data.tv_size_rows.append((name, rooms, size))
+        break
 
     # --- 第一步：从 header 区域（约 row 10-12）建立 列号→房型代码 映射 ---
     # PiM-5 的房型代码行通常在 row 12 附近，包含 SKR/SVR 等代码
